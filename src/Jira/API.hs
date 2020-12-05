@@ -35,11 +35,9 @@ module Jira.API ( createIssue
 import           Jira.API.Authentication
 import           Jira.API.Types
 
-import           Control.Applicative
 import           Control.Lens            hiding ((.=))
 import           Control.Monad.Except
 import           Data.Aeson
-import           Data.Aeson.Lens
 import qualified Data.CaseInsensitive    as CI
 import           Data.List
 import           Data.String.Conversions
@@ -52,12 +50,8 @@ type QueryString = [(BS.ByteString, Maybe BS.ByteString)]
 
 -- Typed API Layer
 
-createIssue :: IssueCreationData -> JiraM String
-createIssue = takeKey <=< postJson "/issue"
-  where takeKey :: Value -> JiraM String
-        takeKey v = tryMaybe (keyNotFound v) $ v ^? key "key" . asString
-        keyNotFound v = JsonFailure $ "Key not found in JSON: " ++ cs (encode v)
-        asString = _String.to cs
+createIssue :: ProjectIdentifier p => IssueCreationData p -> JiraM IssueCreationResponse
+createIssue = postJson "/issue"
 
 getIssue :: IssueIdentifier i => i -> JiraM Issue
 getIssue = getJson' . issuePath
@@ -176,7 +170,7 @@ sendRequest request = do
 urlWithPath :: String -> JiraM String
 urlWithPath urlPath = do
   cleanBaseUrl <- removeTrailingSlashes <$> view baseUrl
-  return $ cleanBaseUrl ++ "/rest/api/2/" ++ removeLeadingSlashes urlPath
+  return $ cleanBaseUrl ++ "/rest/api/3/" ++ removeLeadingSlashes urlPath
   where removeLeadingSlashes  = dropWhile (== '/')
         removeTrailingSlashes = reverse . removeLeadingSlashes . reverse
 

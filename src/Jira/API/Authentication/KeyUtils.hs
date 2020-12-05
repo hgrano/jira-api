@@ -1,6 +1,5 @@
 module Jira.API.Authentication.KeyUtils where
 
-import           Control.Applicative
 import           Crypto.Types.PubKey.RSA (PrivateKey (..), PublicKey (..))
 import           Data.Maybe
 import           OpenSSL.EVP.PKey        (toKeyPair, toPublicKey)

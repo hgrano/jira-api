@@ -8,12 +8,10 @@ module Jira.API.Types.Monad where
 
 import           Jira.API.Types.Config
 
-import           Control.Applicative
 import           Control.Monad.Catch
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Control.Monad.Trans.Except
 import           Data.Aeson
 import           Data.List
 import qualified Data.Map                   as Map
@@ -92,7 +90,7 @@ tryHttp m = try' m >>= either handleException return
     handleException :: Exception e => e -> JiraM a
     handleException e = case fromException (toException e) of
       Nothing -> throwError $ OtherException e
-      Just e  -> throwError $ parseHttpException e
+      Just x  -> throwError $ parseHttpException x
     try' :: IO a -> JiraM (Either SomeException a)
     try' = liftIO . try
 

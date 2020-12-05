@@ -6,6 +6,7 @@ import           Data.Aeson
 import qualified Data.CaseInsensitive as CI
 
 data Status = Open
+            | Backlog
             | InProgress
             | Resolved
             | Closed
@@ -14,6 +15,7 @@ data Status = Open
 
 instance Show Status where
   show Open             = "Open"
+  show Backlog          = "Backlog"
   show InProgress       = "In Progress"
   show Resolved         = "Resolved"
   show Closed           = "Closed"
@@ -24,6 +26,7 @@ instance FromJSON Status where
     statusName <- o .: "name"
     return $ case CI.mk statusName of
       "Open"        -> Open
+      "Backlog"     -> Backlog
       "In Progress" -> InProgress
       "Resolved"    -> Resolved
       "Closed"      -> Closed

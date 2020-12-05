@@ -7,7 +7,6 @@ module Jira.API.Types.Avatar ( AvatarSize(..)
                              , smallAvatar
                              ) where
 
-import           Control.Applicative
 import           Control.Lens
 import           Data.Aeson
 import qualified Data.Map.Strict         as Map

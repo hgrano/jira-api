@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                jira-api
-version:             0.1.0.2
+version:             0.1.0.3
 -- synopsis:
 -- description:
 license:             MIT
@@ -52,5 +52,20 @@ library
                      , containers
                      , case-insensitive
                      , split
+  ghc-options:         -Wall -Werror
   hs-source-dirs:      src
   default-language:    Haskell2010
+
+test-suite test
+  type:                exitcode-stdio-1.0
+  main-is:             Spec.hs
+  ghc-options:         -Wall -Werror
+  hs-source-dirs:      test
+  default-language:    Haskell2010
+  build-depends:       base
+                     , HUnit
+                     , jira-api
+                     , lens
+                     , uuid
+                     , containers
+                     , random

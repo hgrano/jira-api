@@ -6,7 +6,7 @@ module Jira.API.Authentication ( applyAuth
                                ) where
 
 import           Jira.API.Authentication.KeyUtils
-import           Jira.API.Authentication.Types
+import           Jira.API.Authentication.Types     (AuthConfig(BasicAuthConfig, OAuthConfig))
 import           Jira.API.Types.Config
 
 import           Control.Lens
@@ -27,11 +27,11 @@ applyAuth config request =
      in  signOAuth oauth credentials request
 
 getOAuth :: String -> String -> PrivateKey -> OAuth
-getOAuth baseUrl consumerKey privateKey =
-  newOAuth { oauthServerName      = baseUrl
-           , oauthRequestUri      = baseUrl ++ "/plugins/servlet/oauth/request-token"
-           , oauthAuthorizeUri    = baseUrl ++ "/plugins/servlet/oauth/authorize"
-           , oauthAccessTokenUri  = baseUrl ++ "/plugins/servlet/oauth/access-token"
+getOAuth urlBase consumerKey privateKey =
+  newOAuth { oauthServerName      = urlBase
+           , oauthRequestUri      = urlBase ++ "/plugins/servlet/oauth/request-token"
+           , oauthAuthorizeUri    = urlBase ++ "/plugins/servlet/oauth/authorize"
+           , oauthAccessTokenUri  = urlBase ++ "/plugins/servlet/oauth/access-token"
            , oauthSignatureMethod = RSASHA1 privateKey
            , oauthConsumerKey     = cs consumerKey
            , oauthConsumerSecret  = cs ""

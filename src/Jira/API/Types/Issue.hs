@@ -1,8 +1,5 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE IncoherentInstances  #-}
 {-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TemplateHaskell      #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Jira.API.Types.Issue where
 
@@ -12,54 +9,86 @@ import           Jira.API.Types.Project
 import           Jira.API.Types.Status
 import           Jira.API.Types.User
 
-import           Control.Applicative
 import           Control.Lens             (makeLenses, non, to, (^.))
 import           Data.Aeson
-import           Data.List.Split
-import           Data.Maybe
-import           Data.Monoid
+import           Data.List                (elemIndex, intercalate)
+import           Text.Read                (readMaybe)
 
-class IssueIdentifier a where
+class UrlIdentifier a => IssueIdentifier a where
   issueId :: a -> String
+  issueId = urlId
 
-instance (IssueIdentifier i) => UrlIdentifier i where
-  urlId = issueId
+newtype IssueId = IssueId Int deriving (Show, Eq, Ord)
 
-newtype IssueId = IssueId Int deriving (Show, Eq)
+instance FromJSON IssueId where
+  parseJSON v = do
+    s <- parseJSON v
+    i <- maybe (fail "Invalid issue ID") return $ readMaybe s
+    return $ IssueId i
 
-instance IssueIdentifier IssueId where
-  issueId (IssueId n) = show n
+instance UrlIdentifier IssueId where
+  urlId (IssueId n) = show n
 
-newtype IssueNumber = IssueNumber Int deriving (Show, Eq)
+instance IssueIdentifier IssueId
 
-instance IssueIdentifier IssueNumber where
-  issueId (IssueNumber n) = show n
+newtype IssueNumber = IssueNumber Int deriving (Show, Eq, Ord)
 
-data IssueKey = IssueKey ProjectKey IssueNumber deriving (Eq)
+instance UrlIdentifier IssueNumber where
+  urlId (IssueNumber n) = show n
+
+data IssueKey = IssueKey ProjectKey IssueNumber deriving (Eq, Ord)
+
+instance FromJSON IssueKey where
+  parseJSON v = do
+    k <- parseJSON v
+    hyphenIdx <- getOrInvalidProjectKey $ elemIndex '-' k
+    let (proj, n) = splitAt hyphenIdx k
+    num <- getOrInvalidProjectKey (if null n then Nothing else readMaybe $ tail n)
+    return $ IssueKey (ProjectKey proj) (IssueNumber num)
+
+    where getOrInvalidProjectKey = maybe (fail "Invalid project key") return
 
 instance Show IssueKey where
-  show (IssueKey key (IssueNumber n)) =
+  show (IssueKey (ProjectKey key) (IssueNumber n)) =
     key ++ "-" ++ show n
 
-instance IssueIdentifier IssueKey where
-  issueId = show
+instance UrlIdentifier IssueKey where
+  urlId = show
 
-data IssueCreationData = IssueCreationData { _icProject :: ProjectIdentifier
-                                           , _icType    :: IssueTypeIdentifier
-                                           , _icSummary :: String
-                                           } deriving (Show, Eq)
+instance IssueIdentifier IssueKey
+
+type Label = String
+
+data IssueCreationData p = IssueCreationData { _icProject :: p
+                                             , _icType    :: IssueTypeIdentifier
+                                             , _icSummary :: String
+                                             , _icLabels  :: [Label]
+                                             } deriving (Show, Eq)
 
 makeLenses ''IssueCreationData
 
-instance ToJSON IssueCreationData where
+instance ProjectIdentifier p => ToJSON (IssueCreationData p) where
  toJSON issueCreation = object [ "fields" .= fields ]
-   where fields = object [ "project"   .= (issueCreation^.icProject)
+   where fields = object [ "project"   .= object [ projectIdType proj .= projectId proj ]
                          , "issuetype" .= (issueCreation^.icType)
                          , "summary"   .= (issueCreation^.icSummary)
+                         , "labels"    .= toJSON (issueCreation^.icLabels)
                          ]
+         proj = issueCreation^.icProject
 
-data Issue = Issue { _iId          :: String
-                   , _iKey         :: String
+data IssueCreationResponse = IssueCreationResponse { _icrId  :: IssueId
+                                                   , _icrKey :: IssueKey
+                                                   } deriving (Show, Eq)
+
+makeLenses ''IssueCreationResponse
+
+instance FromJSON IssueCreationResponse where
+  parseJSON = withObject "Expected object" $ \o ->
+    IssueCreationResponse <$> o .: "id"
+                          <*> o .: "key"
+
+data Issue = Issue { _iId          :: IssueId
+                   , _iKey         :: IssueKey
                    , _iType        :: IssueType
                    , _iProject     :: Project
                    , _iSummary     :: String
@@ -67,14 +96,14 @@ data Issue = Issue { _iId          :: String
                    , _iAssignee    :: Maybe User
                    , _iReporter    :: User
                    , _iStatus      :: Status
+                   , _iLabels      :: [Label]
                    }
 
 makeLenses ''Issue
 
 instance Show Issue where
   show i = unlines
-    [ "Id: " ++ i^.iId
-    , "Key: " ++ i^.iKey
+    [ "Id: " ++ urlId (i^.iId)
     , "Project: " ++ i^.iProject.pName
     , "Type: " ++ i^.iType.itName
     , "Summary: " ++ i^.iSummary
@@ -82,24 +111,14 @@ instance Show Issue where
     , "Assignee: " ++ i^.iAssignee.to (maybe "Unassigned" show)
     , "Reporter: " ++ i^.iReporter.to show
     , "Status: " ++ i^.iStatus.to show
+    , "Labels: " ++ intercalate "," (i^.iLabels)
     ]
 
 instance Eq Issue where
   a == b = (a^.iId) == (b^.iId)
 
 instance Ord Issue where
-  compare a b = fromMaybe compareKeys $ do
-    (prefix, n)  <- a^.iKey.to splitKey
-    (prefix', m) <- b^.iKey.to splitKey
-    return $ prefix `compare` prefix' <> n `compare` m
-    where
-      compareKeys :: Ordering
-      compareKeys = (a^.iKey) `compare` (b^.iKey)
-
-      splitKey :: String -> Maybe (String, Int)
-      splitKey key = case splitOn "-" key of
-        [prefix, n] -> Just (prefix, read n)
-        _           -> Nothing
+  compare a b = (a^.iKey) `compare` (b^.iKey)
 
 instance FromJSON Issue where
   parseJSON = withObject "Expected object" $ \o -> do
@@ -113,6 +132,7 @@ instance FromJSON Issue where
           <*> fields .: "assignee"
           <*> fields .: "reporter"
           <*> fields .: "status"
+          <*> fields .: "labels"
 
 newtype IssuesResponse = IssuesResponse [Issue]
 

@@ -6,7 +6,6 @@ module Jira.API.Types.IssueType where
 
 import           Jira.API.Types.Classes
 
-import           Control.Applicative
 import           Control.Lens           (makeLenses)
 import           Data.Aeson
 
